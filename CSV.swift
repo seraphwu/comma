@@ -130,3 +130,20 @@ struct ImageIndex {
         return byName[s.lowercased()] ?? byName[(s as NSString).lastPathComponent.lowercased()]
     }
 }
+
+extension CSV {
+    static func insertColumn(_ rows: [[String]], at c: Int) -> [[String]] {
+        rows.map { var r = $0; r.insert("", at: min(c, r.count)); return r }
+    }
+
+    static func deleteColumn(_ rows: [[String]], at c: Int) -> [[String]] {
+        pad(rows.map { var r = $0; if c < r.count { r.remove(at: c) }; return r })
+    }
+
+    /// 刪掉整欄都是空白的直欄。
+    static func dropEmptyColumns(_ rows: [[String]]) -> [[String]] {
+        let n = rows.first?.count ?? 0
+        let keep = (0..<n).filter { c in rows.contains { !$0[c].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } }
+        return pad(rows.map { r in keep.map { r[$0] } })
+    }
+}

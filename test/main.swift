@@ -21,6 +21,15 @@ let (t3, _) = try CSV.decode(utf16)
 assert(CSV.sniffDelimiter(t3) == "\t" && CSV.parse(t3, delimiter: "\t") == [["a", "b"], ["中", "文"]])
 
 assert(CSV.columnName(0) == "A" && CSV.columnName(25) == "Z" && CSV.columnName(26) == "AA")
+assert(CSV.dropEmptyColumns([["a", "", "b", " "], ["c", "", "", ""]]) == [["a", "b"], ["c", ""]])
+assert(CSV.dropEmptyColumns([["", ""]]) == [[""]])
+
+let g = [["a", "b"], ["c", "d"]]
+assert(CSV.insertColumn(g, at: 1) == [["a", "", "b"], ["c", "", "d"]])
+assert(CSV.insertColumn(g, at: 2) == [["a", "b", ""], ["c", "d", ""]])
+assert(CSV.deleteColumn(g, at: 0) == [["b"], ["d"]])
+assert(CSV.deleteColumn([["a"], ["b"]], at: 0) == [[""], [""]])
+
 // 圖片對應：模擬 fb-zheng/out/丹娜絲.csv 找 fb-zheng/丹娜絲/D01.png
 let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("comma-test-\(UUID().uuidString)")
 try FileManager.default.createDirectory(at: tmp.appendingPathComponent("丹娜絲"), withIntermediateDirectories: true)

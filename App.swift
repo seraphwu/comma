@@ -73,6 +73,7 @@ struct CSVView: View {
     @State private var showInspector = true
     @State private var images = ImageIndex()
     @State private var quickLook: URL?
+    @State private var editing = EditingCell()
 
     private func image(_ r: Int, _ c: Int) -> URL? { images.resolve(cell(r, c).wrappedValue) }
 
@@ -102,10 +103,8 @@ struct CSVView: View {
             TableColumnForEach(0..<cols, id: \.self) { c in
                 TableColumn(title(c)) { r in
                     HStack(alignment: .top, spacing: 4) {
-                        // 依內容長高，最多 4 行；更長的到右側檢閱器看全文
-                        TextField("", text: cell(r.id, c), axis: .vertical)
-                            .textFieldStyle(.plain)
-                            .lineLimit(1...4)
+                        let id = CellID(r: r.id, c: c)
+                        CellView(text: cell(r.id, c), id: id, editing: editing)
                         if let url = image(r.id, c) {
                             Button("查看圖片", systemImage: "photo") { open(url) }
                                 .labelStyle(.iconOnly).buttonStyle(.borderless).help(url.path)
@@ -126,51 +125,68 @@ struct CSVView: View {
                 Button("新增列", systemImage: "plus.rectangle") { addRow() }
                 Button("刪除列", systemImage: "minus.rectangle") { deleteRows() }
                     .disabled(selection.isEmpty || doc.rows.count <= 1)
-                Button("新增欄", systemImage: "rectangle.split.3x1") {
-                    for i in doc.rows.indices { doc.rows[i].append("") }
-                }
-                Menu("刪除欄", systemImage: "rectangle.badge.minus") {
-                    ForEach(0..<cols, id: \.self) { c in
-                        Button(title(c)) { for i in doc.rows.indices { doc.rows[i].remove(at: c) } }
-                    }
-                }.disabled(cols <= 1)
+                Button("新增欄", systemImage: "rectangle.split.3x1") { insertColumn(at: cols) }
+                Button("刪除空白欄", systemImage: "rectangle.badge.minus") { editColumns { CSV.dropEmptyColumns($0) } }
+                    .help("刪掉整欄都沒有內容的直欄")
                 Toggle("Excel 相容（BOM）", isOn: $doc.bom)
                     .help("存檔時加上 UTF-8 BOM，Mac 版 Excel 開啟中文才不會亂碼")
                 Button("檢閱器", systemImage: "sidebar.right") { showInspector.toggle() }
             }
         }
         .inspector(isPresented: $showInspector) {
-            Group {
-                if let r = selection.min(), r < doc.rows.count {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("第 \(r + 1) 列").font(.headline)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    GroupBox("直欄") {
+                        VStack(alignment: .leading, spacing: 6) {
                             ForEach(0..<cols, id: \.self) { c in
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(title(c)).font(.caption).foregroundStyle(.secondary)
-                                    TextEditor(text: cell(r, c))
-                                        .font(.body)
-                                        .frame(height: 80)
-                                        .scrollContentBackground(.hidden)
-                                        .padding(4)
-                                        .background(.background.secondary, in: .rect(cornerRadius: 6))
-                                    if let url = image(r, c) {
-                                        Button { open(url) } label: {
-                                            AsyncImage(url: url) { $0.resizable().scaledToFit() } placeholder: { ProgressView() }
-                                                .frame(maxWidth: .infinity, maxHeight: 220)
-                                        }.buttonStyle(.plain).help("點一下放大")
-                                    }
+                                HStack {
+                                    Text(title(c)).lineLimit(1)
+                                    Spacer()
+                                    Button("在右邊插入一欄", systemImage: "plus.circle") { insertColumn(at: c + 1) }
+                                    Button("刪除這一欄", systemImage: "minus.circle") {
+                                        editColumns { CSV.deleteColumn($0, at: c) }
+                                    }.disabled(cols <= 1)
+                                }
+                                .labelStyle(.iconOnly).buttonStyle(.borderless)
+                            }
+                        }.padding(4)
+                    }
+                    if let r = selection.min(), r < doc.rows.count {
+                        Text("第 \(r + 1) 列").font(.headline)
+                        ForEach(0..<cols, id: \.self) { c in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(title(c)).font(.caption).foregroundStyle(.secondary)
+                                TextEditor(text: cell(r, c))
+                                    .font(.body)
+                                    .frame(height: 80)
+                                    .scrollContentBackground(.hidden)
+                                    .padding(4)
+                                    .background(.background.secondary, in: .rect(cornerRadius: 6))
+                                if let url = image(r, c) {
+                                    Button { open(url) } label: {
+                                        AsyncImage(url: url) { $0.resizable().scaledToFit() } placeholder: { ProgressView() }
+                                            .frame(maxWidth: .infinity, maxHeight: 220)
+                                    }.buttonStyle(.plain).help("點一下放大")
                                 }
                             }
-                        }.padding()
+                        }
+                    } else {
+                        Text("選一列，就能在這裡編輯長留言或多行文字").foregroundStyle(.secondary)
                     }
-                } else {
-                    ContentUnavailableView("選一列", systemImage: "text.cursor",
-                                           description: Text("在這裡編輯長留言或多行文字"))
-                }
+                }.padding()
             }
-            .inspectorColumnWidth(min: 220, ideal: 300)
+            .inspectorColumnWidth(min: 240, ideal: 300)
         }
+    }
+
+    /// 欄位變動一次寫回，讓 ⌘Z 一步就能復原。
+    private func editColumns(_ f: ([[String]]) -> [[String]]) {
+        editing.id = nil
+        doc.rows = CSV.pad(f(doc.rows))
+    }
+
+    private func insertColumn(at c: Int) {
+        editColumns { CSV.insertColumn($0, at: c) }
     }
 
     private func addRow() {
@@ -183,6 +199,48 @@ struct CSVView: View {
         let keep = doc.rows.indices.filter { !selection.contains($0) }
         selection = []
         doc.rows = CSV.pad(keep.map { doc.rows[$0] })
+    }
+}
+
+struct CellID: Hashable { let r: Int, c: Int }
+
+/// 正在編輯的格子。用 @Observable 讓每格自己訂閱：Table 不會因 CSVView 的 @State 變動重畫儲存格。
+@Observable final class EditingCell { var id: CellID? }
+
+/// 平常顯示文字，點兩下才進入編輯；按 Return、Esc 或點別處就結束。
+struct CellView: View {
+    @Binding var text: String
+    let id: CellID
+    let editing: EditingCell
+    @FocusState private var focused: Bool
+
+    private func begin() { editing.id = id }
+    private func end() { if editing.id == id { editing.id = nil } }
+
+    var body: some View {
+        if editing.id == id {
+            TextField("", text: $text, axis: .vertical)
+                .textFieldStyle(.plain)
+                .lineLimit(1...4)
+                .focused($focused)
+                .onAppear {
+                    DispatchQueue.main.async {
+                        focused = true
+                        // 預設會全選，一打字就蓋掉原文；改成游標放最後
+                        DispatchQueue.main.async { (NSApp.keyWindow?.firstResponder as? NSTextView)?.moveToEndOfDocument(nil) }
+                    }
+                }
+                .onChange(of: focused) { if !focused { end() } }
+                .onSubmit(end)
+                .onExitCommand(perform: end)
+        } else {
+            // 依內容長高，最多 4 行；更長的到右側檢閱器看全文
+            Text(text.isEmpty ? " " : text)
+                .lineLimit(4)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .simultaneousGesture(TapGesture(count: 2).onEnded(begin))  // 不擋單擊選取列
+        }
     }
 }
 
