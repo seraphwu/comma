@@ -140,6 +140,14 @@ extension CSV {
         pad(rows.map { var r = $0; if c < r.count { r.remove(at: c) }; return r })
     }
 
+    /// 從 (r, c) 往後（d > 0）或往前移 d 格，行尾接下一列開頭；超出表格回傳 nil。
+    static func step(_ r: Int, _ c: Int, by d: Int, rows: Int, cols: Int) -> (r: Int, c: Int)? {
+        guard cols > 0 else { return nil }
+        let i = r * cols + c + d
+        guard i >= 0, i < rows * cols else { return nil }
+        return (i / cols, i % cols)
+    }
+
     /// 刪掉整欄都是空白的直欄。
     static func dropEmptyColumns(_ rows: [[String]]) -> [[String]] {
         let n = rows.first?.count ?? 0

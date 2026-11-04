@@ -74,6 +74,7 @@ struct CSVView: View {
     @State private var images = ImageIndex()
     @State private var quickLook: URL?
     @State private var editing = EditingCell()
+    @FocusState private var tableFocused: Bool
 
     private func image(_ r: Int, _ c: Int) -> URL? { images.resolve(cell(r, c).wrappedValue) }
 
@@ -95,7 +96,21 @@ struct CSVView: View {
         return h.isEmpty ? CSV.columnName(c) : "\(CSV.columnName(c)) · \(h)"
     }
 
+    /// Tab／Shift-Tab：移到下一格／上一格，行尾接下一列開頭；超出表格就結束編輯。
+    private func tab(from id: CellID, by d: Int, proxy: ScrollViewProxy) {
+        guard let n = CSV.step(id.r, id.c, by: d, rows: doc.rows.count, cols: cols) else {
+            editing.id = nil
+            return
+        }
+        selection = [n.r]
+        editing.row = n.r
+        editing.column = n.c
+        editing.id = CellID(r: n.r, c: n.c)
+        proxy.scrollTo(n.r)
+    }
+
     var body: some View {
+        ScrollViewReader { proxy in
         Table(doc.rows.indices.map(RowRef.init), selection: $selection) {
             TableColumn("#") { r in
                 Text("\(r.id + 1)").foregroundStyle(.secondary).monospacedDigit()
@@ -104,7 +119,8 @@ struct CSVView: View {
                 TableColumn(title(c)) { r in
                     HStack(alignment: .top, spacing: 4) {
                         let id = CellID(r: r.id, c: c)
-                        CellView(text: cell(r.id, c), id: id, editing: editing)
+                        CellView(text: cell(r.id, c), id: id, editing: editing,
+                                 tab: { tab(from: id, by: $0, proxy: proxy) })
                         if let url = image(r.id, c) {
                             Button("查看圖片", systemImage: "photo") { open(url) }
                                 .labelStyle(.iconOnly).buttonStyle(.borderless).help(url.path)
@@ -115,6 +131,23 @@ struct CSVView: View {
             }
         }
         .id(images.count)  // Table 不會因 images 變動重畫儲存格，索引載入後重建一次
+        .focused($tableFocused)
+        // Table 內建：點兩下或按 Return 觸發 primaryAction。儲存格上不放手勢，否則單擊選不到列。
+        .contextMenu(forSelectionType: Int.self, menu: { _ in }, primaryAction: { rows in
+            guard rows.count == 1, let r = rows.first, r < doc.rows.count, cols > 0 else { return }
+            // 按 Return 編輯「目前所在欄」；點兩下編輯滑鼠所在那一格
+            if NSApp.currentEvent?.type != .keyDown, let h = editing.hover { editing.column = h }
+            editing.id = CellID(r: r, c: min(editing.column, cols - 1))
+        })
+        .onChange(of: selection) {
+            editing.row = selection.count == 1 ? selection.first : nil
+            // 用滑鼠點選時，目前所在欄 = 點到的那一欄
+            if let e = NSApp.currentEvent, e.type == .leftMouseDown || e.type == .leftMouseUp, let h = editing.hover {
+                editing.column = h
+            }
+        }
+        .onChange(of: editing.id) { if editing.id == nil { tableFocused = true } }  // 結束編輯後回到表格，可再按 Enter
+        }
         .quickLookPreview($quickLook)
         .task(id: fileURL) {
             let url = fileURL
@@ -205,16 +238,21 @@ struct CSVView: View {
 struct CellID: Hashable { let r: Int, c: Int }
 
 /// 正在編輯的格子。用 @Observable 讓每格自己訂閱：Table 不會因 CSVView 的 @State 變動重畫儲存格。
-@Observable final class EditingCell { var id: CellID? }
+@Observable final class EditingCell {
+    var id: CellID?   // 正在編輯的格子
+    var row: Int?     // 目前選取的列（只選一列時）
+    var column = 0    // 目前所在欄：單擊設定，按 Enter 就編輯這欄
+    var hover: Int?   // 滑鼠所在欄（用來判斷點到哪一格）
+}
 
 /// 平常顯示文字，點兩下才進入編輯；按 Return、Esc 或點別處就結束。
 struct CellView: View {
     @Binding var text: String
     let id: CellID
     let editing: EditingCell
+    let tab: (Int) -> Void
     @FocusState private var focused: Bool
 
-    private func begin() { editing.id = id }
     private func end() { if editing.id == id { editing.id = nil } }
 
     var body: some View {
@@ -233,13 +271,23 @@ struct CellView: View {
                 .onChange(of: focused) { if !focused { end() } }
                 .onSubmit(end)
                 .onExitCommand(perform: end)
+                // Shift-Tab 在 macOS 送出的是 backtab（U+0019）
+                .onKeyPress(keys: [.tab, KeyEquivalent("\u{19}")], phases: .down) { press in
+                    tab(press.key == .tab && !press.modifiers.contains(.shift) ? 1 : -1)
+                    return .handled
+                }
         } else {
             // 依內容長高，最多 4 行；更長的到右側檢閱器看全文
             Text(text.isEmpty ? " " : text)
                 .lineLimit(4)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
-                .simultaneousGesture(TapGesture(count: 2).onEnded(begin))  // 不擋單擊選取列
+                .overlay {  // 標出「目前所在格」：按 Enter 會編輯這格
+                    if editing.id == nil && editing.row == id.r && editing.column == id.c {
+                        RoundedRectangle(cornerRadius: 4).stroke(Color.accentColor, lineWidth: 1.5).padding(-4)
+                    }
+                }
+                .onContinuousHover { if case .active = $0, editing.hover != id.c { editing.hover = id.c } }
         }
     }
 }

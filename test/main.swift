@@ -30,6 +30,11 @@ assert(CSV.insertColumn(g, at: 2) == [["a", "b", ""], ["c", "d", ""]])
 assert(CSV.deleteColumn(g, at: 0) == [["b"], ["d"]])
 assert(CSV.deleteColumn([["a"], ["b"]], at: 0) == [[""], [""]])
 
+assert(CSV.step(0, 0, by: 1, rows: 2, cols: 3)! == (0, 1))
+assert(CSV.step(0, 2, by: 1, rows: 2, cols: 3)! == (1, 0))   // 行尾 Tab 跳下一列
+assert(CSV.step(1, 0, by: -1, rows: 2, cols: 3)! == (0, 2))  // Shift-Tab 回上一列行尾
+assert(CSV.step(1, 2, by: 1, rows: 2, cols: 3) == nil && CSV.step(0, 0, by: -1, rows: 2, cols: 3) == nil)
+
 // 圖片對應：模擬 fb-zheng/out/丹娜絲.csv 找 fb-zheng/丹娜絲/D01.png
 let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("comma-test-\(UUID().uuidString)")
 try FileManager.default.createDirectory(at: tmp.appendingPathComponent("丹娜絲"), withIntermediateDirectories: true)
