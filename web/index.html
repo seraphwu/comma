@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<!-- 只允許 App 內建的腳本；Markdown 裡的 <script>、onerror= 等內嵌 JS 都不會執行 -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src file:; style-src 'unsafe-inline'; img-src * data: file:">
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.65 -apple-system, "PingFang TC", sans-serif; margin: 0; padding: 20px 28px; max-width: 860px; }
+  h1, h2 { border-bottom: 1px solid #8884; padding-bottom: .2em; }
+  code, pre { font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
+  pre { background: #8881; padding: 12px; border-radius: 6px; overflow: auto; }
+  :not(pre) > code { background: #8882; padding: .1em .35em; border-radius: 4px; }
+  table { border-collapse: collapse; } th, td { border: 1px solid #8886; padding: 4px 10px; }
+  blockquote { margin: 0; padding-left: 1em; border-left: 3px solid #8886; color: #888; }
+  img { max-width: 100%; }
+  a { color: #2a6fdb; }
+  .pele { margin: 1em 0; }
+  .pele-error { color: #c33; white-space: pre-wrap; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #1e1e1e; color: #ddd; }
+    a { color: #6ea8ff; }
+    .pele { --pele-bg: #1e1e1e; --pele-fg: #ddd; --pele-muted: #999; --pele-line: #bbb;
+            --pele-surface: #2a2a2a; --pele-surface-alt: #333; --pele-border: #555; --pele-accent: #6ea8ff; }
+  }
+</style>
+<script src="marked.umd.js"></script>
+<script src="pele.global.js"></script>
+<script src="app.js"></script>
+</head>
+<body><main id="out"></main></body>
+</html>
