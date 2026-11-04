@@ -71,12 +71,11 @@ struct CSVView: View {
     var fileURL: URL?
     @State private var selection = Set<Int>()
     @State private var showInspector = true
-    @State private var images = ImageIndex()
     @State private var quickLook: URL?
     @State private var editing = EditingCell()
     @FocusState private var tableFocused: Bool
 
-    private func image(_ r: Int, _ c: Int) -> URL? { images.resolve(cell(r, c).wrappedValue) }
+    private func image(_ r: Int, _ c: Int) -> URL? { ImageRef.resolve(cell(r, c).wrappedValue, relativeTo: fileURL) }
 
     private func open(_ url: URL) {
         if url.isFileURL { quickLook = url } else { NSWorkspace.shared.open(url) }
@@ -123,14 +122,14 @@ struct CSVView: View {
                                  tab: { tab(from: id, by: $0, proxy: proxy) })
                         if let url = image(r.id, c) {
                             Button("查看圖片", systemImage: "photo") { open(url) }
-                                .labelStyle(.iconOnly).buttonStyle(.borderless).help(url.path)
+                                .labelStyle(.iconOnly).buttonStyle(.borderless).help(ImageRef.relativePath(url, from: fileURL))
                         }
                     }
                     .padding(.vertical, 6)
                 }.width(min: 80, ideal: 220)
             }
         }
-        .id(images.count)  // Table 不會因 images 變動重畫儲存格，索引載入後重建一次
+        .id(fileURL)  // 第一次存檔後相對路徑才有基準；Table 不會自己重畫儲存格，重建一次
         .focused($tableFocused)
         // Table 內建：點兩下或按 Return 觸發 primaryAction。儲存格上不放手勢，否則單擊選不到列。
         .contextMenu(forSelectionType: Int.self, menu: { _ in }, primaryAction: { rows in
@@ -149,10 +148,6 @@ struct CSVView: View {
         .onChange(of: editing.id) { if editing.id == nil { tableFocused = true } }  // 結束編輯後回到表格，可再按 Enter
         }
         .quickLookPreview($quickLook)
-        .task(id: fileURL) {
-            let url = fileURL
-            images = await Task.detached { ImageIndex(near: url) }.value
-        }
         .toolbar {
             ToolbarItemGroup {
                 Button("新增列", systemImage: "plus.rectangle") { addRow() }

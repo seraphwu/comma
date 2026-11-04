@@ -35,14 +35,24 @@ assert(CSV.step(0, 2, by: 1, rows: 2, cols: 3)! == (1, 0))   // 行尾 Tab 跳�
 assert(CSV.step(1, 0, by: -1, rows: 2, cols: 3)! == (0, 2))  // Shift-Tab 回上一列行尾
 assert(CSV.step(1, 2, by: 1, rows: 2, cols: 3) == nil && CSV.step(0, 0, by: -1, rows: 2, cols: 3) == nil)
 
-// 圖片對應：模擬 fb-zheng/out/丹娜絲.csv 找 fb-zheng/丹娜絲/D01.png
+// 圖片：只認明確路徑。模擬 fb-zheng/out/丹娜絲.csv 與 fb-zheng/丹娜絲/D01.png
 let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("comma-test-\(UUID().uuidString)")
 try FileManager.default.createDirectory(at: tmp.appendingPathComponent("丹娜絲"), withIntermediateDirectories: true)
 try FileManager.default.createDirectory(at: tmp.appendingPathComponent("out"), withIntermediateDirectories: true)
-try Data().write(to: tmp.appendingPathComponent("丹娜絲/D01.png"))
-let idx = ImageIndex(near: tmp.appendingPathComponent("out/丹娜絲.csv"))
-for v in ["D01", "d01.png", "丹娜絲/D01.png", " D01 "] { assert(idx.resolve(v)?.lastPathComponent == "D01.png", v) }
-assert(idx.resolve("D02") == nil && idx.resolve("應該說颱風生成的機會提升了吧！") == nil)
-assert(idx.resolve("https://x.com/a.jpg") != nil && idx.resolve("https://x.com/a") == nil)
+let png = tmp.appendingPathComponent("丹娜絲/D01.png")
+try Data().write(to: png)
+let outCSV = tmp.appendingPathComponent("out/丹娜絲.csv")
+let rootCSV = tmp.appendingPathComponent("貼文紀錄表.csv")
+assert(ImageRef.resolve("丹娜絲/D01.png", relativeTo: rootCSV)?.path == png.standardizedFileURL.path)
+assert(ImageRef.resolve(" ../丹娜絲/D01.png ", relativeTo: outCSV)?.path == png.standardizedFileURL.path)
+assert(ImageRef.resolve(png.path, relativeTo: nil) != nil)  // 絕對路徑不需 CSV 位置
+for v in ["D01", "D01.png", "丹娜絲/D01", "丹娜絲/D02.png", "應該說颱風生成的機會提升了吧！"] {
+    assert(ImageRef.resolve(v, relativeTo: rootCSV) == nil, v)  // 不猜檔名、不搜尋資料夾
+}
+assert(ImageRef.resolve("丹娜絲/D01.png", relativeTo: nil) == nil)  // 未存檔的新文件沒有相對基準
+assert(ImageRef.resolve("https://x.com/a.jpg", relativeTo: nil) != nil && ImageRef.resolve("https://x.com/a", relativeTo: nil) == nil)
+assert(ImageRef.relativePath(png, from: rootCSV) == "丹娜絲/D01.png")
+assert(ImageRef.relativePath(png, from: outCSV) == "../丹娜絲/D01.png")
+assert(ImageRef.relativePath(URL(string: "https://x.com/a.jpg")!, from: rootCSV) == "https://x.com/a.jpg")
 try FileManager.default.removeItem(at: tmp)
 print("CSV self-test OK")

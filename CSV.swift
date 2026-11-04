@@ -88,46 +88,37 @@ enum CSV {
     }
 }
 
-/// 把儲存格文字（D01、D01.png、丹娜絲/D01.png、絕對路徑、http 圖片網址）對應到圖片檔。
-struct ImageIndex {
+/// 儲存格寫明圖片路徑才顯示，不搜尋資料夾、不猜檔名：
+/// 絕對路徑、~ 開頭，或相對於 CSV 所在資料夾的路徑（如 丹娜絲/D01.png、../丹娜絲/D01.png）；也接受 http(s) 圖片網址。
+enum ImageRef {
     static let exts: Set<String> = ["png", "jpg", "jpeg", "gif", "heic", "webp", "tif", "tiff", "bmp"]
-    private var byName: [String: URL] = [:]
-    var count: Int { byName.count }
 
-    init() {}
-
-    /// ponytail: 只掃 CSV 所在資料夾與上一層、往下 3 層、最多 20000 個檔案；圖放更遠再加「指定圖片資料夾」。
-    init(near file: URL?) {
-        guard let dir = file?.deletingLastPathComponent() else { return }
-        var seen = 0
-        for root in [dir, dir.deletingLastPathComponent()] {
-            guard let e = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil,
-                                                         options: [.skipsHiddenFiles, .skipsPackageDescendants]) else { continue }
-            for case let url as URL in e {
-                if e.level > 3 { e.skipDescendants(); continue }
-                seen += 1
-                if seen > 20000 { return }
-                guard Self.exts.contains(url.pathExtension.lowercased()) else { continue }
-                for key in [url.lastPathComponent, url.deletingPathExtension().lastPathComponent] {
-                    let k = key.lowercased()
-                    if byName[k] == nil { byName[k] = url }  // 先掃到的（較近的）優先
-                }
-            }
-        }
-    }
-
-    func resolve(_ value: String) -> URL? {
+    static func resolve(_ value: String, relativeTo csv: URL?) -> URL? {
         let s = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !s.isEmpty, s.count < 300, !s.contains("\n") else { return nil }
+        guard !s.isEmpty, s.count < 1024, !s.contains("\n") else { return nil }
         if s.hasPrefix("http://") || s.hasPrefix("https://") {
-            guard let u = URL(string: s), Self.exts.contains(u.pathExtension.lowercased()) else { return nil }
+            guard let u = URL(string: s), exts.contains(u.pathExtension.lowercased()) else { return nil }
             return u
         }
-        if s.hasPrefix("/") || s.hasPrefix("~") {
-            let u = URL(fileURLWithPath: (s as NSString).expandingTildeInPath)
-            return Self.exts.contains(u.pathExtension.lowercased()) && FileManager.default.fileExists(atPath: u.path) ? u : nil
+        let path = (s as NSString).expandingTildeInPath
+        let u: URL
+        if path.hasPrefix("/") {
+            u = URL(fileURLWithPath: path)
+        } else {
+            guard let dir = csv?.deletingLastPathComponent() else { return nil }
+            u = dir.appendingPathComponent(path)
         }
-        return byName[s.lowercased()] ?? byName[(s as NSString).lastPathComponent.lowercased()]
+        guard exts.contains(u.pathExtension.lowercased()), FileManager.default.fileExists(atPath: u.path) else { return nil }
+        return u.standardizedFileURL
+    }
+
+    /// 給 📷 提示用：從 CSV 所在資料夾到圖片的相對路徑（如 丹娜絲/D01.png、../丹娜絲/D01.png）；網址原樣顯示。
+    static func relativePath(_ file: URL, from csv: URL?) -> String {
+        guard file.isFileURL, let csv else { return file.isFileURL ? file.path : file.absoluteString }
+        let dir = csv.deletingLastPathComponent().resolvingSymlinksInPath().pathComponents
+        let f = file.resolvingSymlinksInPath().pathComponents
+        let common = zip(dir, f).prefix { $0 == $1 }.count
+        return (Array(repeating: "..", count: dir.count - common) + f[common...]).joined(separator: "/")
     }
 }
 

@@ -4,7 +4,7 @@
 
 - **CSV**：表格直接編輯，新增／刪除列與欄；右側檢閱器編輯長文字與多行內容
 - **編碼**：自動辨識 UTF-8、UTF-8 BOM、UTF-16、Big5；存成 UTF-8，可勾「Excel 相容（BOM）」讓 Mac 版 Excel 開啟不亂碼
-- **圖片**：儲存格寫 `D01`、`D01.png`、`子資料夾/D01.png`、絕對路徑或圖片網址時，旁邊出現 📷，點一下用 Quick Look 開啟（會在 CSV 所在資料夾與上一層往下找）
+- **圖片**：儲存格寫明圖片路徑時，旁邊出現 📷，點一下用 Quick Look 開啟。可寫絕對路徑、`~/…`、相對於 CSV 所在資料夾的路徑（如 `丹娜絲/D01.png`、`../丹娜絲/D01.png`），或圖片網址；不會自動搜尋同名檔案
 - **Markdown**：左邊編輯、右邊即時預覽（⇧⌘N 新增）
 - **流程圖**：` ```mermaid ` 區塊以 [Pele](https://github.com/obsidianmd/pele) 渲染
 
@@ -23,7 +23,7 @@
 | 檔案 | 用途 |
 |---|---|
 | `App.swift` | SwiftUI 介面、文件類型、Markdown 預覽 |
-| `CSV.swift` | CSV 解析／輸出、編碼偵測、圖片對應 |
+| `CSV.swift` | CSV 解析／輸出、編碼偵測、圖片路徑解析 |
 | `web/` | 預覽頁；內含 [marked](https://github.com/markedjs/marked) 與 Pele |
 | `icon/make-icon.swift` | 產生 App 圖示（正體中文置中逗點） |
 | `test/main.swift` | 自我測試 |
