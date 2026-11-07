@@ -35,6 +35,20 @@ assert(CSV.step(0, 2, by: 1, rows: 2, cols: 3)! == (1, 0))   // 行尾 Tab 跳�
 assert(CSV.step(1, 0, by: -1, rows: 2, cols: 3)! == (0, 2))  // Shift-Tab 回上一列行尾
 assert(CSV.step(1, 2, by: 1, rows: 2, cols: 3) == nil && CSV.step(0, 0, by: -1, rows: 2, cols: 3) == nil)
 
+// 尋找取代
+let fr = [["留言者", "留言內容"], ["王小明", "颱風好大，颱風快走"], ["Amy", "Typhoon"]]
+assert(CSV.matches(fr, "颱風", caseSensitive: false) == [CellID(r: 1, c: 1)])
+assert(CSV.matches(fr, "typhoon", caseSensitive: false) == [CellID(r: 2, c: 1)])
+assert(CSV.matches(fr, "typhoon", caseSensitive: true).isEmpty && CSV.matches(fr, "", caseSensitive: false).isEmpty)
+let fm = [CellID(r: 0, c: 1), CellID(r: 2, c: 0)]
+assert(CSV.nextMatch(fm, after: nil, by: 1, cols: 2) == fm[0] && CSV.nextMatch(fm, after: nil, by: -1, cols: 2) == fm[1])
+assert(CSV.nextMatch(fm, after: fm[0], by: 1, cols: 2) == fm[1] && CSV.nextMatch(fm, after: fm[1], by: 1, cols: 2) == fm[0])  // 繞回
+assert(CSV.nextMatch(fm, after: fm[0], by: -1, cols: 2) == fm[1])
+assert(CSV.replace("颱風好大，颱風快走", "颱風", with: "風", caseSensitive: false) == ("風好大，風快走", 2))
+assert(CSV.replace("aAa", "a", with: "aa", caseSensitive: true) == ("aaAaa", 2))  // 取代內容含關鍵字也不會無限迴圈
+let (fr2, frn) = CSV.replaceAll(fr, "typhoon", with: "颱風", caseSensitive: false)
+assert(frn == 1 && fr2[2][1] == "颱風" && fr2[1] == fr[1])
+
 // 圖片：只認明確路徑。模擬 fb-zheng/out/丹娜絲.csv 與 fb-zheng/丹娜絲/D01.png
 let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("comma-test-\(UUID().uuidString)")
 try FileManager.default.createDirectory(at: tmp.appendingPathComponent("丹娜絲"), withIntermediateDirectories: true)

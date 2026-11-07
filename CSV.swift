@@ -146,3 +146,51 @@ extension CSV {
         return pad(rows.map { r in keep.map { r[$0] } })
     }
 }
+
+struct CellID: Hashable { let r: Int, c: Int }
+
+// MARK: - 尋找取代
+extension CSV {
+    static func options(_ caseSensitive: Bool) -> String.CompareOptions { caseSensitive ? [] : [.caseInsensitive] }
+
+    /// 含有 q 的格子，依列、欄順序。
+    // ponytail: 每次重畫都全表掃描；幾萬格以上再快取結果。
+    static func matches(_ rows: [[String]], _ q: String, caseSensitive cs: Bool) -> [CellID] {
+        guard !q.isEmpty else { return [] }
+        var out: [CellID] = []
+        for (r, row) in rows.enumerated() {
+            for (c, s) in row.enumerated() where s.range(of: q, options: options(cs)) != nil { out.append(CellID(r: r, c: c)) }
+        }
+        return out
+    }
+
+    /// 從 from 往後（d > 0）或往前找下一個符合的格子，到底繞回另一端。
+    static func nextMatch(_ m: [CellID], after from: CellID?, by d: Int, cols: Int) -> CellID? {
+        guard !m.isEmpty else { return nil }
+        guard let f = from else { return d > 0 ? m.first : m.last }
+        let key = { (x: CellID) in x.r * cols + x.c }
+        return d > 0 ? (m.first { key($0) > key(f) } ?? m.first) : (m.last { key($0) < key(f) } ?? m.last)
+    }
+
+    /// 取代 s 裡所有的 q，回傳新字串與取代次數。
+    static func replace(_ s: String, _ q: String, with rep: String, caseSensitive cs: Bool) -> (String, Int) {
+        guard !q.isEmpty else { return (s, 0) }
+        var out = "", rest = s[...], n = 0
+        while let r = rest.range(of: q, options: options(cs)) {
+            out += rest[..<r.lowerBound] + rep
+            rest = rest[r.upperBound...]
+            n += 1
+        }
+        return (out + rest, n)
+    }
+
+    static func replaceAll(_ rows: [[String]], _ q: String, with rep: String, caseSensitive cs: Bool) -> ([[String]], Int) {
+        var total = 0
+        let out = rows.map { $0.map { s in
+            let (t, n) = replace(s, q, with: rep, caseSensitive: cs)
+            total += n
+            return t
+        } }
+        return (out, total)
+    }
+}

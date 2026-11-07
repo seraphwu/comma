@@ -8,8 +8,8 @@
   <key>CFBundleIconFile</key><string>Comma</string>
   <key>CFBundleIdentifier</key><string>tw.seraph.comma</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.3</string>
-  <key>CFBundleVersion</key><string>4</string>
+  <key>CFBundleShortVersionString</key><string>1.4</string>
+  <key>CFBundleVersion</key><string>5</string>
   <key>CFBundleDevelopmentRegion</key><string>zh_TW</string>
   <key>CFBundleLocalizations</key><array><string>zh-Hant</string></array>
   <key>LSMinimumSystemVersion</key><string>14.4</string>
